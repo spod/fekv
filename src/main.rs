@@ -1,31 +1,38 @@
-#![deny(warnings)]
-
-// Taken from:
-// https://github.com/hyperium/hyper/blob/0.14.x/examples/hello.rs
-// Also under MIT license
-
+use hyper::server::conn::AddrStream;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::Server;
 use std::convert::Infallible;
 
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+mod handlers;
+mod store;
 
-async fn hello(_: Request<Body>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::from("Hello World!")))
-}
+use crate::handlers::router;
 
 #[tokio::main]
-pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    pretty_env_logger::init();
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let make_svc = make_service_fn(move |conn: &AddrStream| {
+        let addr = conn.remote_addr();
+        let service = service_fn(move |req| router(req, addr));
+        async move { Ok::<_, Infallible>(service) }
+    });
 
-    let make_svc = make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(hello)) });
+    let listen_addr = ([127, 0, 0, 1], 3000).into();
 
-    let addr = ([127, 0, 0, 1], 3000).into();
+    let server = Server::bind(&listen_addr).serve(make_svc);
 
-    let server = Server::bind(&addr).serve(make_svc);
+    println!("Listening on http://{}", listen_addr);
 
-    println!("Listening on http://{}", addr);
+    let graceful = server.with_graceful_shutdown(shutdown_signal());
 
-    server.await?;
+    if let Err(e) = graceful.await {
+        eprintln!("server error: {}", e);
+    }
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
 }

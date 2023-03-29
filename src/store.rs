@@ -7,35 +7,51 @@
 //   and later I guess delete(...) and range(...)
 //
 
-// use std::collections::HashMap;
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind, Result};
 
-// pub trait Storage<K,V,E> {
-//     fn get(&self, key: &K) -> Result<Option<V>, E>;
-//     fn set(&self, key: &K, value: &V) -> Result<Option<V>, E>;
-// }
+pub trait Storage<'a> {
+    fn get(&self, key: &str) -> Result<&[u8]>;
+    fn set(&mut self, key: &'a str, buf: &'a [u8]);
+}
 
-// pub struct MemStore<K,V> {
-//     store: HashMap<K,V>
-// }
+#[derive(Debug)]
+pub struct MemStore<'a> {
+    store: HashMap<&'a str, &'a [u8]>,
+}
 
-// impl<K,V> MemStore<K,V> {
-//     pub fn new() -> MemStore<K, V> {
-//         MemStore { store: HashMap::new() }
-//     }
+impl<'a> MemStore<'a> {
+    pub fn new() -> MemStore<'a> {
+        MemStore {
+            store: HashMap::new(),
+        }
+    }
+}
 
-// }
+impl<'a> Storage<'a> for MemStore<'a> {
+    fn get(&self, key: &str) -> Result<&[u8]> {
+        let err = Error::new(ErrorKind::Other, "missing key");
+        self.store.get(key).ok_or(err).copied()
+    }
+    fn set(&mut self, key: &'a str, buf: &'a [u8]) {
+        self.store.insert(key, buf);
+    }
+}
 
-// impl<K,V,E> Storage<K,V,E> for MemStore<K,V> {
-//     fn get(&self, key: &K) -> Result<Option<V>, E> {
-//     //     error[E0599]: the method `get` exists for struct `HashMap<K, V>`, but its trait bounds were not satisfied
-//     //     --> src/store.rs:30:20
-//     //      |
-//     //   30 |         self.store.get(&key)
-//     //      |                    ^^^ method cannot be called on `HashMap<K, V>` due to unsatisfied trait bounds
-//         self.store.get(&key)
-//     }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     fn set(&self, key: &K, value: &V) -> Result<Option<V>, E> {
-//         todo!()
-//     }
-// }
+    #[test]
+    fn test_memstore() {
+        let mut ms = MemStore::new();
+
+        ms.set("foo", b"bar");
+        ms.set("bar", b"baz");
+        assert_eq!(ms.get("foo").unwrap(), b"bar");
+        assert_eq!(ms.get("bar").unwrap(), b"baz");
+
+        let e = ms.get("missing");
+        assert!(e.is_err())
+    }
+}

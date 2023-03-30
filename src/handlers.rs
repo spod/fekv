@@ -1,6 +1,9 @@
 use hyper::{Body, Method, Request, Response, StatusCode, Uri};
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use url::Url;
+
+use crate::store::MemStore;
 
 static INDEX: &[u8] =
     b"<html><head><title>kv</title></head><body><h1>kv</h1>A simple Key Value store! <br /><br /> \
@@ -24,7 +27,11 @@ fn route_root(req_uri: &Uri) -> String {
 }
 
 // base router which calls our other handlers or returns 404
-pub async fn router(req: Request<Body>, addr: SocketAddr) -> Result<Response<Body>, hyper::Error> {
+pub async fn router(
+    req: Request<Body>,
+    addr: SocketAddr,
+    store: Arc<Mutex<MemStore<'_>>>,
+) -> Result<Response<Body>, hyper::Error> {
     let route = route_root(req.uri());
     let route = route.as_str();
     println!(
@@ -34,6 +41,7 @@ pub async fn router(req: Request<Body>, addr: SocketAddr) -> Result<Response<Bod
         route
     );
 
+    println!("store: {:?}", store);
     match (req.method(), route) {
         (&Method::GET, "/") | (&Method::GET, "/index.html") => Ok(Response::new(INDEX.into())),
 

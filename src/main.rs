@@ -2,6 +2,7 @@ use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
 use std::convert::Infallible;
+use std::sync::{Arc, Mutex};
 
 mod handlers;
 mod store;
@@ -10,9 +11,12 @@ use crate::handlers::router;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let shared_store = Arc::new(Mutex::new(store::MemStore::new()));
+
     let make_svc = make_service_fn(move |conn: &AddrStream| {
         let addr = conn.remote_addr();
-        let service = service_fn(move |req| router(req, addr));
+        let shared_store = shared_store.clone();
+        let service = service_fn(move |req| router(req, addr, shared_store.to_owned()));
         async move { Ok::<_, Infallible>(service) }
     });
 

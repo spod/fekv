@@ -42,3 +42,5 @@ Implementation will roughly follow [tinykv course outline](https://github.com/ta
 * https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html
 * https://github.com/talent-plan/tinykv
 * https://hyper.rs/
+* https://dev.to/daaitch/rust-ownership-and-borrows-fighting-the-borrow-checker-4ea3
+

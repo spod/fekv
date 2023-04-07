@@ -1,6 +1,6 @@
 # fekv
 
-Toy Key Value datastore with a REST API with raft based consensus written in Rust.
+Toy key value datastore with a REST API with raft based consensus written in Rust.
 
 ## Usage
 
@@ -8,19 +8,26 @@ Run a server: `cargo run`
 
 Make some queries:
 ``` shell
-$ curl --fail -X "GET" localhost:3000/kv/foo
+$ ./example.sh 
+$ curl --fail -X "GET" localhost:3000/fekv/foo
 curl: (22) The requested URL returned error: 404
-$ curl --fail -X "POST" localhost:3000/kv/foo -d "bar" ; echo
+$ curl --fail -X "PUT" localhost:3000/fekv/foo -d "bar"
 OK
-$ curl --fail -X "GET" localhost:3000/kv/foo ; echo
+$ curl --fail -X "GET" localhost:3000/fekv/foo
 bar
-$ curl --fail -X "POST" localhost:3000/kv/foo -d "baz" ; echo
+$ curl --fail -X "DELETE" localhost:3000/fekv/foo
 OK
-$ curl --fail -X "GET" localhost:3000/kv/foo ; echo
+$ curl --fail -X "POST" localhost:3000/fekv/foo -d "BAR"
+OK
+$ curl --fail -X "GET" localhost:3000/fekv/foo
+BAR
+$ curl --fail -X "POST" localhost:3000/fekv/foo -d "baz"
+OK
+$ curl --fail -X "GET" localhost:3000/fekv/foo
 baz
-$ curl --fail -X "DELETE" localhost:3000/kv/foo ; echo
+$ curl --fail -X "DELETE" localhost:3000/fekv/foo
 OK
-$ curl --fail -X "GET" localhost:3000/kv/foo
+$ curl --fail -X "GET" localhost:3000/fekv/foo
 curl: (22) The requested URL returned error: 404
 ```
 

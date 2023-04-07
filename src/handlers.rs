@@ -18,13 +18,13 @@ use crate::store::memstore::MemStore;
 use crate::store::Storage;
 
 static INDEX: &[u8] =
-    b"<html><head><title>kv</title></head><body><h1>kv</h1>A simple Key Value store! <br /><br /> \
+    b"<html><head><title>fekv</title></head><body><h1>fekv</h1>A Toy Key Value store! <br /><br /> \
 Try PUT/POSTing data to <code>/kv/{key}</code> then GETing it back. <br /> <br />\
 <pre> \
-$ curl --fail -X 'PUT' localhost:3000/kv/foo -d 'bar' <br /> \
-$ curl --fail -X 'GET' localhost:3000/kv/foo <br /> \
+$ curl --fail -X 'PUT' localhost:3000/fekv/foo -d 'bar' <br /> \
+$ curl --fail -X 'GET' localhost:3000/fekv/foo <br /> \
 $ curl --fail -X 'DELETE' localhost:3000/kv/foo <br /> \
-$ curl --fail -X 'GET' localhost:3000/kv/foo \
+$ curl --fail -X 'GET' localhost:3000/fekv/foo \
 </pre></body></html>";
 
 static OK: &[u8] = b"OK";
@@ -78,10 +78,10 @@ pub async fn router(
 
         (&Method::GET, "/hello") => hello(req, rest).await,
 
-        (&Method::DELETE, "/kv")
-        | (&Method::GET, "/kv")
-        | (&Method::POST, "/kv")
-        | (&Method::PUT, "/kv") => kv(req, rest, store).await,
+        (&Method::DELETE, "/fekv")
+        | (&Method::GET, "/fekv")
+        | (&Method::POST, "/fekv")
+        | (&Method::PUT, "/fekv") => fekv_handler(req, rest, store).await,
 
         (&Method::GET, "/favicon.ico") => response_404().await,
         _ => {
@@ -91,7 +91,7 @@ pub async fn router(
     }
 }
 
-pub async fn kv(
+pub async fn fekv_handler(
     req: Request<Body>,
     key: String,
     store: Arc<Mutex<MemStore>>,

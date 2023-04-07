@@ -1,6 +1,6 @@
-# raftexample-rs
+# fekv
 
-Key Value datastore with a REST API with raft based consensus in rust.
+Toy Key Value datastore with a REST API with raft based consensus written in Rust.
 
 ## Usage
 

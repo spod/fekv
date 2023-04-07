@@ -30,7 +30,6 @@ This is a toy project and it is not intended for real world use.
 It is missing many things including: Authentication/Authorization, Configuration, Logging, Metrics, Security or Code reviews, testing etc.
 
 ## TODO
-* [ ] improve error handling in kv(...) route handler
 * [ ] add a stat/info endpoint to show some basic info on backing store, keys etc
 * [ ] pick one of redb or sled as backing store and get it working
 * [ ] add raft

@@ -18,10 +18,12 @@ use crate::store::{MemStore, Storage};
 
 static INDEX: &[u8] =
     b"<html><head><title>kv</title></head><body><h1>kv</h1>A simple Key Value store! <br /><br /> \
-Try POSTing data to <code>/kv/{key}</code> then GETing it back. <br /> <br />\
+Try PUT/POSTing data to <code>/kv/{key}</code> then GETing it back. <br /> <br />\
 <pre> \
-$ curl localhost:3000/kv/foo -XPOST -d 'bar' <br /> \
-$ curl localhost:3000/kv/foo \
+$ curl --fail -X 'PUT' localhost:3000/kv/foo -d 'bar' <br /> \
+$ curl --fail -X 'GET' localhost:3000/kv/foo <br /> \
+$ curl --fail -X 'DELETE' localhost:3000/kv/foo <br /> \
+$ curl --fail -X 'GET' localhost:3000/kv/foo \
 </pre></body></html>";
 
 static OK: &[u8] = b"OK";
@@ -75,7 +77,7 @@ pub async fn router(
 
         (&Method::GET, "/hello") => hello(req, rest).await,
 
-        (&Method::DELETE, "/kv") | (&Method::GET, "/kv") | (&Method::POST, "/kv") => {
+        (&Method::DELETE, "/kv") | (&Method::GET, "/kv") | (&Method::POST, "/kv") | (&Method::PUT, "/kv")  => {
             kv(req, rest, store).await
         }
 
@@ -101,7 +103,7 @@ pub async fn kv(
                 Err(_err) => return response_404().await,
             }
         }
-        &Method::POST => {
+        &Method::POST | &Method::PUT => {
             let b = hyper::body::to_bytes(req).await.unwrap();
             let mut st = store.try_lock_owned().unwrap();
             let res = st.set(key.to_string(), b.to_vec());

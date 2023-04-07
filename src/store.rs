@@ -4,12 +4,11 @@
 // MemStore - Memory backed Store implementation using std::collections::HashMap;
 //
 // For now Storage Trait is get/set only
-//  - need to add delete(...), range(...) and possibly more, see:
+//  - May need to add range(...) and possibly more (column family, raft proto stuff), see:
 //    - see https://github.com/talent-plan/tinykv/blob/course/proto/proto/kvrpcpb.proto#L12-L64
-//  - may want some admin queries
+//  - May also want some admin queries
 //
 // Will add file backends using:
-//   - Flat File (if necessary)
 //   - redb/sled
 //
 

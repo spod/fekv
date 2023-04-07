@@ -75,7 +75,9 @@ pub async fn router(
 
         (&Method::GET, "/hello") => hello(req, rest).await,
 
-        (&Method::GET, "/kv") | (&Method::POST, "/kv") => kv(req, rest, store).await,
+        (&Method::DELETE, "/kv") | (&Method::GET, "/kv") | (&Method::POST, "/kv") => {
+            kv(req, rest, store).await
+        }
 
         (&Method::GET, "/favicon.ico") => response_404().await,
         _ => {
@@ -102,8 +104,19 @@ pub async fn kv(
         &Method::POST => {
             let b = hyper::body::to_bytes(req).await.unwrap();
             let mut st = store.try_lock_owned().unwrap();
-            st.set(key.to_string(), b.to_vec());
-            return Ok(Response::new(OK.into()));
+            let res = st.set(key.to_string(), b.to_vec());
+            match res {
+                Ok(_res) => return Ok(Response::new(OK.into())),
+                Err(_err) => return response_404().await,
+            }
+        }
+        &Method::DELETE => {
+            let mut st = store.try_lock_owned().unwrap();
+            let res = st.delete(key.to_string());
+            match res {
+                Ok(_res) => return Ok(Response::new(OK.into())),
+                Err(_err) => return response_404().await,
+            }
         }
         _ => {
             println!("invalid request method: {} returning 404 ...", req.method());

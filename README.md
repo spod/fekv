@@ -8,12 +8,20 @@ Run a server: `cargo run`
 
 Make some queries:
 ``` shell
-$ curl --fail localhost:3000/kv/foo
+$ curl --fail -X "GET" localhost:3000/kv/foo
 curl: (22) The requested URL returned error: 404
-$ curl localhost:3000/kv/foo -XPOST -d 'bar' 
+$ curl --fail -X "POST" localhost:3000/kv/foo -d "bar" ; echo
 OK
-$ curl --fail localhost:3000/kv/foo
+$ curl --fail -X "GET" localhost:3000/kv/foo ; echo
 bar
+$ curl --fail -X "POST" localhost:3000/kv/foo -d "baz" ; echo
+OK
+$ curl --fail -X "GET" localhost:3000/kv/foo ; echo
+baz
+$ curl --fail -X "DELETE" localhost:3000/kv/foo ; echo
+OK
+$ curl --fail -X "GET" localhost:3000/kv/foo
+curl: (22) The requested URL returned error: 404
 ```
 
 ## Warning

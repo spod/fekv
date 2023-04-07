@@ -1,3 +1,9 @@
+//
+// Server entrypoint - creates a store::MemStore instance (shared_store)
+// and has lots of hyper.rs/tokio example copy/paste to set up web server
+// The web service entrypoint is handlers::router(...)
+//
+
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;

@@ -21,6 +21,15 @@ This is a toy project and it is not intended for real world use.
 
 It is missing many things including: Authentication/Authorization, Configuration, Logging, Metrics, Security or Code reviews, testing etc.
 
+## TODO
+* [ ] improve error handling in kv(...) route handler
+* [ ] add a stat/info endpoint to show some basic info on backing store, keys etc
+* [ ] pick one of redb or sled as backing store and get it working
+* [ ] add raft
+* [ ] figure out max value sizes and handle errors appropriately
+* [ ] add some checksumming to ensure we don't have errors / damage data
+* [ ] add a logging backend and/or config of some kind so `ab -n 100000 ...` tests aren't blocked on console output
+
 ## Approach
 
 Building something comparable [etcd/contrib/raftexample](https://github.com/etcd-io/etcd/tree/main/contrib/raftexample) to in rust using the [tikv/raft-rs](https://github.com/tikv/raft-rs) raft library, with either [redb](https://github.com/cberner/redb) or [sled](https://github.com/spacejam/sled) for storage and the [hyper](https://hyper.rs/) web framework.

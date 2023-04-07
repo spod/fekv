@@ -1,3 +1,13 @@
+//
+// All http server handling
+//
+// Key functions are:
+//   - route_root(...) - helper to return the "route" from a uri
+//   - router(...) - http entrypoint which routes to other handlers as appropriate
+//   - hello(...) - hello world!
+//   - kv(...) - REST interface to store backend
+//
+
 use hyper::{Body, Method, Request, Response, StatusCode, Uri};
 use std::net::SocketAddr;
 use std::sync::Arc;

@@ -1,10 +1,15 @@
-// TODO in memory backed Store implementation using std::collections::HashMap;
+// Storage backends
 //
-// Store should be a trait with methods:
-//   get(key) -> string
-//   set(key, value)
+// Store - Trait backends have to implement
+// MemStore - Memory backed Store implementation using std::collections::HashMap;
 //
-//   and later I guess delete(...) and range(...)
+// For now Storage Trait is get/set only
+//  - may need to add delete(...), range(...) for raft?
+//  - may want some admin queries
+//
+// Will add file backends using:
+//   - Flat File
+//   - redb/sled
 //
 
 use std::collections::HashMap;

@@ -53,12 +53,12 @@ mod tests {
     fn test_memstore() {
         let mut ms = MemStore::new();
 
-        ms.set("foo".to_string(), "bar".as_bytes().to_vec());
-        ms.set("bar".to_owned(), "baz".as_bytes().to_vec());
-        assert_eq!(ms.get("foo".to_string()).unwrap(), b"bar");
-        assert_eq!(ms.get("bar".to_string()).unwrap(), b"baz");
+        ms.set(String::from("foo"), b"bar".to_vec());
+        ms.set(String::from("bar"), b"baz".to_vec());
+        assert_eq!(ms.get(String::from("foo")).unwrap(), b"bar");
+        assert_eq!(ms.get(String::from("bar")).unwrap(), b"baz");
 
-        let e = ms.get("missing".to_string());
+        let e = ms.get(String::from("missing"));
         assert!(e.is_err())
     }
 }

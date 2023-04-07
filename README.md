@@ -2,6 +2,20 @@
 
 Key Value datastore with a REST API with raft based consensus in rust.
 
+## Usage
+
+Run a server: `cargo run`
+
+Make some queries:
+``` shell
+$ curl --fail localhost:3000/kv/foo
+curl: (22) The requested URL returned error: 404
+$ curl localhost:3000/kv/foo -XPOST -d 'bar' 
+OK
+$ curl --fail localhost:3000/kv/foo
+bar
+```
+
 ## Warning
 This is a toy project and it is not intended for real world use.
 

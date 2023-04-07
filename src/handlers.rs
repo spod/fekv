@@ -1,9 +1,10 @@
 use hyper::{Body, Method, Request, Response, StatusCode, Uri};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::{Mutex};
 use url::Url;
 
-use crate::store::MemStore;
+use crate::store::{MemStore, Storage};
 
 static INDEX: &[u8] =
     b"<html><head><title>kv</title></head><body><h1>kv</h1>A simple Key Value store! <br /><br /> \
@@ -43,7 +44,7 @@ fn route_root(req_uri: &Uri) -> (String, Option<String>, Option<String>) {
 pub async fn router(
     req: Request<Body>,
     addr: SocketAddr,
-    _store: Arc<Mutex<MemStore<'_>>>,
+    store: Arc<Mutex<MemStore<'_>>>,
 ) -> Result<Response<Body>, hyper::Error> {
     let (route, rest, _query) = route_root(req.uri());
     let route = route.as_str();
@@ -51,20 +52,21 @@ pub async fn router(
 
     if route != "/favicon.ico" {
         println!(
-            "request: {} from client: {} with route: {}",
+            "request: {} {} from client: {} with route: {}",
+            req.method(),
             req.uri(),
             addr,
             route
         );
     }
 
-    // println!("store: {:?}", store);
+    println!("store: {:?}", store);
     match (req.method(), route) {
         (&Method::GET, "/") | (&Method::GET, "/index.html") => Ok(Response::new(INDEX.into())),
 
         (&Method::GET, "/hello") => hello(req, rest).await,
 
-        (&Method::GET, "/kv") | (&Method::POST, "/kv") => Ok(Response::new(TODO.into())),
+        (&Method::GET, "/kv") | (&Method::POST, "/kv") => kv(req, rest, store).await,
 
         (&Method::GET, "/favicon.ico") => response_404().await,
         _ => {
@@ -72,6 +74,38 @@ pub async fn router(
             response_404().await
         }
     }
+}
+
+pub async fn kv(req: Request<Body>, key: String, store: Arc<Mutex<MemStore<'_>>>) -> Result<Response<Body>, hyper::Error> {
+    match req.method() {
+        &Method::GET => {
+            println!("GET for key {}", key);
+            let val: &[u8] = b"";
+            {
+                let st = store.lock().await;
+                println!("{:?}",  st.get(&key));
+            }
+            let res = val.clone();
+            return  Ok(Response::new(res.into()))
+        }
+        &Method::POST => {
+            let b = hyper::body::to_bytes(req).await.unwrap();
+            println!("POST for key {}, should set key to value: {:?}", key, b);
+            {
+                let mut st = store.try_lock_owned().unwrap();
+                st.set("todo", b"todo");
+            }
+            return  Ok(Response::new(TODO.into()))
+        }
+        _ => {
+            println!("invalid request method: {} returning 404 ...", req.method());
+            return response_404().await
+        }
+
+    }
+    // let b = hyper::body::to_bytes(req).await;
+    // println!("kv: key:{} got body: {:?}", key, b);
+    // Ok(Response::new(TODO.into()))
 }
 
 pub async fn hello(_req: Request<Body>, name: String) -> Result<Response<Body>, hyper::Error> {

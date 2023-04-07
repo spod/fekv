@@ -2,6 +2,11 @@
 
 Key Value datastore with a REST API with raft based consensus in rust.
 
+## Warning
+This is a toy project and it is not intended for real world use.
+
+It is missing many things including: Authentication/Authorization, Configuration, Logging, Metrics, Security or Code reviews, testing etc.
+
 ## Approach
 
 Building something comparable [etcd/contrib/raftexample](https://github.com/etcd-io/etcd/tree/main/contrib/raftexample) to in rust using the [tikv/raft-rs](https://github.com/tikv/raft-rs) raft library, with either [redb](https://github.com/cberner/redb) or [sled](https://github.com/spacejam/sled) for storage and the [hyper](https://hyper.rs/) web framework.

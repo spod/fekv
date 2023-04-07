@@ -1,41 +1,27 @@
-// Storage backends
 //
-// Store - Trait backends have to implement
-// MemStore - Memory backed Store implementation using std::collections::HashMap;
-//
-// For now Storage Trait is get/set only
-//  - May need to add range(...) and possibly more (column family, raft proto stuff), see:
-//    - see https://github.com/talent-plan/tinykv/blob/course/proto/proto/kvrpcpb.proto#L12-L64
-//  - May also want some admin queries
-//
-// Will add file backends using:
-//   - redb/sled
+// TODO - add a disk store implementation using heed
 //
 
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::vec::Vec;
 
-pub trait Storage {
-    fn get(&self, key: String) -> Result<Vec<u8>>;
-    fn set(&mut self, key: String, buf: Vec<u8>) -> Result<bool>;
-    fn delete(&mut self, key: String) -> Result<bool>;
-}
+use super::Storage;
 
 #[derive(Debug)]
-pub struct MemStore {
+pub struct DiskStore {
     store: HashMap<String, Vec<u8>>,
 }
 
-impl MemStore {
-    pub fn new() -> MemStore {
-        MemStore {
+impl DiskStore {
+    pub fn new() -> DiskStore {
+        DiskStore {
             store: HashMap::new(),
         }
     }
 }
 
-impl Storage for MemStore {
+impl Storage for DiskStore {
     fn get(&self, key: String) -> Result<Vec<u8>> {
         let err = Error::new(ErrorKind::Other, "missing key");
         self.store.get(&key).ok_or(err).cloned()
@@ -63,8 +49,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_memstore() {
-        let mut ms = MemStore::new();
+    fn test_diskstore() {
+        let mut ms = DiskStore::new();
 
         // set & get
         ms.set(String::from("foo"), b"bar".to_vec()).unwrap();

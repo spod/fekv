@@ -14,7 +14,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::store::{MemStore, Storage};
+use crate::store::memstore::MemStore;
+use crate::store::Storage;
 
 static INDEX: &[u8] =
     b"<html><head><title>kv</title></head><body><h1>kv</h1>A simple Key Value store! <br /><br /> \
@@ -77,9 +78,10 @@ pub async fn router(
 
         (&Method::GET, "/hello") => hello(req, rest).await,
 
-        (&Method::DELETE, "/kv") | (&Method::GET, "/kv") | (&Method::POST, "/kv") | (&Method::PUT, "/kv")  => {
-            kv(req, rest, store).await
-        }
+        (&Method::DELETE, "/kv")
+        | (&Method::GET, "/kv")
+        | (&Method::POST, "/kv")
+        | (&Method::PUT, "/kv") => kv(req, rest, store).await,
 
         (&Method::GET, "/favicon.ico") => response_404().await,
         _ => {

@@ -31,7 +31,6 @@ It is missing many things including: Authentication/Authorization, Configuration
 
 ## TODO
 * [ ] add a stat/info endpoint to show some basic info on backing store, keys etc
-* [ ] pick one of redb or sled as backing store and get it working
 * [ ] add raft
 * [ ] figure out max value sizes and handle errors appropriately
 * [ ] add some checksumming to ensure we don't have errors / damage data
@@ -39,7 +38,7 @@ It is missing many things including: Authentication/Authorization, Configuration
 
 ## Approach
 
-Building something comparable [etcd/contrib/raftexample](https://github.com/etcd-io/etcd/tree/main/contrib/raftexample) to in rust using the [tikv/raft-rs](https://github.com/tikv/raft-rs) raft library, with either [redb](https://github.com/cberner/redb) or [sled](https://github.com/spacejam/sled) for storage and the [hyper](https://hyper.rs/) web framework.
+Building something comparable [etcd/contrib/raftexample](https://github.com/etcd-io/etcd/tree/main/contrib/raftexample) to in rust using the [tikv/raft-rs](https://github.com/tikv/raft-rs) raft library, using the [heed library](https://github.com/meilisearch/heed) for [lmdb](http://www.lmdb.tech/doc/index.html) as storage and the [hyper](https://hyper.rs/) web framework.
 
 Implementation will roughly follow [tinykv course outline](https://github.com/talent-plan/tinykv).
 
@@ -50,4 +49,5 @@ Implementation will roughly follow [tinykv course outline](https://github.com/ta
 * https://github.com/talent-plan/tinykv
 * https://hyper.rs/
 * https://dev.to/daaitch/rust-ownership-and-borrows-fighting-the-borrow-checker-4ea3
+
 

@@ -14,7 +14,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::store::memstore::MemStore;
 use crate::store::Storage;
 
 static INDEX: &[u8] =

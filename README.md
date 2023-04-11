@@ -45,6 +45,7 @@ Currently it's just a standalone KV store backed by an lmdb, no raft implemented
 * [ ] add some checksumming to ensure we don't have errors / damage data (at least for lmdb backed data)
 * [ ] add a logging backend and/or config of some kind so `ab -n 100000 ...` tests aren't blocked on console output
 * [ ] consider doing part 3 & 4 of tinykv (multiraft, transactions)
+* [ ] clean up error handling, tests etc - see [Modular Errors in Rust](https://sabrinajewson.org/blog/errors)
 
 ## Approach
 

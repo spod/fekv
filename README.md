@@ -1,6 +1,6 @@
 # fekv
 
-Toy key value datastore with a REST API with raft based consensus written in Rust.
+A toy key value datastore with a REST API backed by LMDB written in Rust which will be extended with raft based consensus.
 
 ## Usage
 
@@ -36,12 +36,15 @@ This is a toy project and it is not intended for real world use.
 
 It is missing many things including: Authentication/Authorization, Configuration, Logging, Metrics, Security or Code reviews, testing etc.
 
+Currently it's just a standalone KV store backed by an lmdb, no raft implemented yet.
+
 ## TODO
+* [ ] add raft peer, raft store per [tinykv talent plan part 2 Raft KV ](https://github.com/talent-plan/tinykv/blob/course/doc/project2-RaftKV.md)
 * [ ] add a stat/info endpoint to show some basic info on backing store, keys etc
-* [ ] add raft
 * [ ] figure out max value sizes and handle errors appropriately
-* [ ] add some checksumming to ensure we don't have errors / damage data
+* [ ] add some checksumming to ensure we don't have errors / damage data (at least for lmdb backed data)
 * [ ] add a logging backend and/or config of some kind so `ab -n 100000 ...` tests aren't blocked on console output
+* [ ] consider doing part 3 & 4 of tinykv (multiraft, transactions)
 
 ## Approach
 

@@ -32,10 +32,7 @@ impl Storage for MemStore {
         let res = self.store.remove(&key);
         match res {
             Some(_res) => return Ok(true),
-            None => {
-                let err = Error::new(ErrorKind::Other, "no key");
-                return Err(err);
-            }
+            None => return Ok(false),
         }
     }
 }
@@ -67,8 +64,8 @@ mod tests {
         // second get should throw an error
         let e = ms.get(String::from("delete_me"));
         assert!(e.is_err());
-        // second delete should also throw an error
-        let e = ms.delete(String::from("delete_me"));
-        assert!(e.is_err());
+        // second delete should return false as key removed
+        let res = ms.delete(String::from("delete_me"));
+        assert_eq!(res.unwrap(), false);
     }
 }

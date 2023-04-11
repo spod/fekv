@@ -12,7 +12,7 @@ use heed::{Database, Env, EnvOpenOptions};
 
 use super::Storage;
 
-const DB_PATH: &str = "./target";
+const DB_PATH: &str = "./data";
 const DB_NAME: &str = "fekv.mdb";
 const DB_STORE_SIZE: usize = 1_073_741_824; //1GiB
 
@@ -71,16 +71,20 @@ impl Storage for DiskStore {
         }
     }
 
-    fn delete(&mut self, _key: String) -> Result<bool> {
-        // let res = self.store.remove(&key);
-        // match res {
-        //     Some(_res) => return Ok(true),
-        //     None => {
-        //         let err = Error::new(ErrorKind::Other, "no key");
-        //         return Err(err);
-        //     }
-        // }
-        Ok(true)
+    fn delete(&mut self, key: String) -> Result<bool> {
+        let mut wtxn = self.env.write_txn().unwrap();
+        let r = self.db.delete(&mut wtxn, &key);
+        if r.is_err() {
+            let err = r.unwrap_err();
+            return Err(Error::new(ErrorKind::Other, err.to_string()));
+        }
+        let deleted = r.unwrap();
+        let r = wtxn.commit();
+        if r.is_err() {
+            let err = r.unwrap_err();
+            return Err(Error::new(ErrorKind::Other, err.to_string()));
+        }
+        Ok(deleted)
     }
 }
 
@@ -146,14 +150,14 @@ mod tests {
         // delete
         ms.set(String::from("delete_me"), b"junk".to_vec()).unwrap();
         assert_eq!(ms.get(String::from("delete_me")).unwrap(), b"junk");
-        // // can delete once
-        // let res = ms.delete(String::from("delete_me"));
-        // assert_eq!(res.unwrap(), true);
-        // // second get should throw an error
-        // let e = ms.get(String::from("delete_me"));
-        // assert!(e.is_err());
-        // // second delete should also throw an error
-        // let e = ms.delete(String::from("delete_me"));
-        // assert!(e.is_err());
+        // can delete once
+        let res = ms.delete(String::from("delete_me"));
+        assert_eq!(res.unwrap(), true);
+        // second get should throw an error
+        let e = ms.get(String::from("delete_me"));
+        assert!(e.is_err());
+        // second delete should return false as key removed
+        let res = ms.delete(String::from("delete_me"));
+        assert_eq!(res.unwrap(), false);
     }
 }

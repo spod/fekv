@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::store::Storage;
+use crate::kvstore::KVStorage;
 
 static INDEX: &[u8] =
     b"<html><head><title>fekv</title></head><body><h1>fekv</h1>A Toy Key Value store! <br /><br /> \
@@ -56,7 +56,7 @@ fn route_root(req_uri: &Uri) -> (String, Option<String>, Option<String>) {
 pub async fn router(
     req: Request<Body>,
     addr: SocketAddr,
-    store: Arc<Mutex<impl Storage>>,
+    store: Arc<Mutex<impl KVStorage>>,
 ) -> Result<Response<Body>, hyper::Error> {
     let (route, rest, _query) = route_root(req.uri());
     let route = route.as_str();
@@ -93,7 +93,7 @@ pub async fn router(
 pub async fn fekv_handler(
     req: Request<Body>,
     key: String,
-    store: Arc<Mutex<impl Storage>>,
+    store: Arc<Mutex<impl KVStorage>>,
 ) -> Result<Response<Body>, hyper::Error> {
     match req.method() {
         &Method::GET => {

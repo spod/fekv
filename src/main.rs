@@ -12,14 +12,15 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 mod handlers;
-mod store;
+mod kvstore;
+mod raftstore;
 
 use crate::handlers::router;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // let shared_store = Arc::new(Mutex::new(store::memstore::MemStore::new()));
-    let shared_store = Arc::new(Mutex::new(store::diskstore::DiskStore::new()));
+    let shared_store = Arc::new(Mutex::new(kvstore::diskstore::DiskKVStore::new()));
 
     let make_svc = make_service_fn(move |conn: &AddrStream| {
         let addr = conn.remote_addr();

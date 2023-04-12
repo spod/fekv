@@ -1,5 +1,5 @@
 //
-// Disk backed Storage implementation using heed
+// Disk backed KVStorage implementation using heed
 //
 
 use std::fs::create_dir_all;
@@ -10,19 +10,19 @@ use std::vec::Vec;
 use heed::types::{ByteSlice, Str};
 use heed::{Database, Env, EnvOpenOptions};
 
-use super::Storage;
+use super::KVStorage;
 
 const DB_PATH: &str = "./data";
 const DB_NAME: &str = "fekv.mdb";
-const DB_STORE_SIZE: usize = 1_073_741_824; //1GiB
+const DB_STORE_SIZE: usize = 1_073_741_824;
 
-pub struct DiskStore {
+pub struct DiskKVStore {
     env: Env,
     db: Database<Str, ByteSlice>,
 }
 
-impl DiskStore {
-    pub fn new() -> DiskStore {
+impl DiskKVStore {
+    pub fn new() -> DiskKVStore {
         let db_path = Path::join(Path::new(&DB_PATH), &DB_NAME);
         _ = create_dir_all(&db_path);
         let env = EnvOpenOptions::new()
@@ -31,11 +31,11 @@ impl DiskStore {
             .open(db_path)
             .unwrap();
         let db = env.create_database(Some(&DB_NAME)).unwrap();
-        DiskStore { env: env, db: db }
+        DiskKVStore { env: env, db: db }
     }
 }
 
-impl Storage for DiskStore {
+impl KVStorage for DiskKVStore {
     fn get(&self, key: String) -> Result<Vec<u8>> {
         let rtxn = self.env.read_txn().unwrap();
         let r = self.db.get(&rtxn, &key);
@@ -128,14 +128,14 @@ mod tests {
     }
 
     #[test]
-    fn test_diskstore() {
+    fn test_diskkvstore() {
         // TODO - extract this test out to one that is shared across all store types
         //
         // TODO - alternate constructor that lets us create a temp db and/or some way to pass
         // a config context through from main server or something which is ignored by MemStore
         //
         // WARNING - for now this test will touch the "prod" db on disk
-        let mut ms = DiskStore::new();
+        let mut ms = DiskKVStore::new();
 
         // set & get
         ms.set(String::from("foo"), b"bar".to_vec()).unwrap();

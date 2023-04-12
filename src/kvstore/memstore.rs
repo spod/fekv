@@ -2,22 +2,23 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::vec::Vec;
 
-use super::Storage;
+use super::KVStorage;
 
 #[derive(Debug)]
-pub struct MemStore {
+pub struct MemKVStore {
     store: HashMap<String, Vec<u8>>,
 }
 
-impl MemStore {
-    pub fn new() -> MemStore {
-        MemStore {
+impl MemKVStore {
+    #[allow(dead_code)]
+    pub fn new() -> MemKVStore {
+        MemKVStore {
             store: HashMap::new(),
         }
     }
 }
 
-impl Storage for MemStore {
+impl KVStorage for MemKVStore {
     fn get(&self, key: String) -> Result<Vec<u8>> {
         let err = Error::new(ErrorKind::Other, "missing key");
         self.store.get(&key).ok_or(err).cloned()
@@ -42,8 +43,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_memstore() {
-        let mut ms = MemStore::new();
+    fn test_memkvstore() {
+        let mut ms = MemKVStore::new();
 
         // set & get
         ms.set(String::from("foo"), b"bar".to_vec()).unwrap();

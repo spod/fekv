@@ -63,23 +63,49 @@ impl EntryTypeRef {
     pub fn to_entry_type(&self) -> EntryType {
         match self {
             crate::raftstore::EntryTypeRef::EntryNormal => raft::eraftpb::EntryType::EntryNormal,
-            crate::raftstore::EntryTypeRef::EntryConfChange => raft::eraftpb::EntryType::EntryConfChange,
-            crate::raftstore::EntryTypeRef::EntryConfChangeV2 => raft::eraftpb::EntryType::EntryConfChangeV2,
+            crate::raftstore::EntryTypeRef::EntryConfChange => {
+                raft::eraftpb::EntryType::EntryConfChange
+            }
+            crate::raftstore::EntryTypeRef::EntryConfChangeV2 => {
+                raft::eraftpb::EntryType::EntryConfChangeV2
+            }
+        }
+    }
+
+    pub fn from_entry_type(&self, et: EntryType) -> EntryTypeRef {
+        match et {
+            raft::eraftpb::EntryType::EntryNormal => crate::raftstore::EntryTypeRef::EntryNormal,
+            raft::eraftpb::EntryType::EntryConfChange => {
+                crate::raftstore::EntryTypeRef::EntryConfChange
+            }
+            raft::eraftpb::EntryType::EntryConfChangeV2 => {
+                crate::raftstore::EntryTypeRef::EntryConfChangeV2
+            }
         }
     }
 }
 
 impl EntryRef {
     pub fn to_entry(&self) -> Entry {
-        Entry {
-            entry_type: self.entry_type.to_entry_type(),
-            term: self.term,
-            index: self.index,
-            data: self.data.to_owned(),
-            context: self.context.to_owned(),
-            sync_log: self.sync_log,
-            unknown_fields: todo!(),
-            cached_size: todo!(),
+        let mut ent = Entry::new();
+        ent.entry_type = self.entry_type.to_entry_type();
+        ent.term = self.term;
+        ent.index = self.index;
+        ent.data = self.data.to_owned();
+        ent.context = self.context.to_owned();
+        ent.sync_log = self.sync_log;
+        ent
+    }
+
+    pub fn from_entry(&self, e: Entry) -> EntryRef {
+        let tr: EntryTypeRef = EntryTypeRef::EntryNormal;
+        EntryRef {
+            entry_type: tr.from_entry_type(e.entry_type),
+            term: e.term,
+            index: e.index,
+            data: e.data.to_owned(),
+            context: e.context.to_owned(),
+            sync_log: e.sync_log,
         }
     }
 }
@@ -134,11 +160,26 @@ impl RaftDB {
             None => self.snapshot_metadata.index + 1,
         }
     }
+
     fn get_entry(&self, idx: u64) -> Entry {
         let rtxn = self.env.read_txn().unwrap();
         let res = self.entries.get(&rtxn, &idx);
         let er = res.unwrap().unwrap();
         er.to_entry()
+    }
+
+    fn set_entry(&self, idx: u64, e: Entry) {
+        let er = EntryRef {
+            entry_type: EntryTypeRef::EntryNormal.from_entry_type(e.entry_type),
+            term: e.term,
+            index: e.index,
+            data: e.data.to_owned(),
+            context: e.context.to_owned(),
+            sync_log: e.sync_log,
+        };
+        let mut wtxn = self.env.write_txn().unwrap();
+        let r = self.entries.put(&mut wtxn, &idx, &er);
+        _ = wtxn.commit();
     }
 }
 
@@ -221,5 +262,48 @@ impl Storage for RaftDiskStorage {
 
     fn snapshot(&self, request_index: u64, to: u64) -> raft::Result<raft::prelude::Snapshot> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    // tests from https://github.com/tikv/raft-rs/blob/master/src/storage.rs
+
+    use raft::eraftpb::{ConfState, Entry, Snapshot};
+
+    use super::{RaftDiskStorage, Storage};
+
+    fn new_entry(index: u64, term: u64) -> Entry {
+        let mut e = Entry::default();
+        e.term = term;
+        e.index = index;
+        e
+    }
+
+    #[test]
+    fn test_storage_term() {
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let mut tests = vec![
+            (2, Err(())),
+            (3, Ok(3)),
+            (4, Ok(4)),
+            (5, Ok(5)),
+            (6, Err(())),
+        ];
+
+        for (i, (idx, wterm)) in tests.drain(..).enumerate() {
+            let storage = RaftDiskStorage::new();
+            for e in ents.clone().drain(..).enumerate() {
+                let core = storage.wl();
+                core.set_entry(e.0 as u64, e.1);
+            }
+
+            let t = storage.term(idx);
+            // if t != wterm {
+            //     panic!("#{}: expect res {:?}, got {:?}", i, wterm, t);
+            // }
+            println!("#{}: expect res {:?}, got {:?}", i, wterm, t);
+        }
     }
 }

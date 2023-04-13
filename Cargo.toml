@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = { version = "1", features = ["serde"] }
 heed = "0.11.0"
 hyper = { version = "0.14", features = ["full"] }
+protobuf = "3.2.0"
 raft = "0.7.0"
+serde = "1.0.160"
 tokio = { version = "1", features = ["full"] }
 url = "2.3.1"

@@ -408,6 +408,8 @@ mod test {
     // where noted tests are based on tests from:
     // https://github.com/tikv/raft-rs/blob/master/src/storage.rs
 
+    use std::panic::{self, AssertUnwindSafe};
+
     use super::{RaftDiskStorage, Storage};
     use raft::eraftpb::{ConfState, Entry, Snapshot};
     use raft::GetEntriesContext;
@@ -558,5 +560,70 @@ mod test {
         // TODO uncomment after we implement compact(...)
         // storage.wl().compact(4).unwrap();
         // assert_eq!(storage.first_index(), Ok(4));
+    }
+
+    #[test]
+    fn test_storage_append() {
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&ents);
+        let mut tests = vec![
+            (
+                vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)],
+                Some(vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)]),
+            ),
+            (
+                vec![new_entry(3, 3), new_entry(4, 6), new_entry(5, 6)],
+                Some(vec![new_entry(3, 3), new_entry(4, 6), new_entry(5, 6)]),
+            ),
+            (
+                vec![
+                    new_entry(3, 3),
+                    new_entry(4, 4),
+                    new_entry(5, 5),
+                    new_entry(6, 5),
+                ],
+                Some(vec![
+                    new_entry(3, 3),
+                    new_entry(4, 4),
+                    new_entry(5, 5),
+                    new_entry(6, 5),
+                ]),
+            ),
+            // overwrite compacted raft logs is not allowed
+            (
+                vec![new_entry(2, 3), new_entry(3, 3), new_entry(4, 5)],
+                None,
+            ),
+            // truncate the existing entries and append
+            (
+                vec![new_entry(4, 5)],
+                Some(vec![new_entry(3, 3), new_entry(4, 5)]),
+            ),
+            // direct append
+            (
+                vec![new_entry(6, 6)],
+                Some(vec![
+                    new_entry(3, 3),
+                    new_entry(4, 4),
+                    new_entry(5, 5),
+                    new_entry(6, 6),
+                ]),
+            ),
+        ];
+        for (i, (entries, wentries)) in tests.drain(..).enumerate() {
+            let storage = temp_store_with_entries(&ents);
+
+            let res = panic::catch_unwind(AssertUnwindSafe(|| storage.wl().append(&entries)));
+            if let Some(wentries) = wentries {
+                let _ = res.unwrap();
+                let e = &storage.entries(3, 3 + wentries.len() as u64, 100000, GetEntriesContext::empty(false)).unwrap();
+                if *e != wentries {
+                    panic!("#{}: want {:?}, entries {:?}", i, wentries, e);
+                }
+            } else {
+                res.unwrap_err();
+            }
+        }
     }
 }

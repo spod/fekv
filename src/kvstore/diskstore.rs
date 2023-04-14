@@ -95,11 +95,9 @@ mod tests {
 
     #[test]
     fn test_heed() {
-        println!("start");
         let env_path = Path::new("target").join("heed-tst.mdb");
         let _ = fs::remove_dir_all(&env_path);
 
-        println!("done remove dir all in {:?}", &env_path);
         fs::create_dir_all(&env_path).unwrap();
         let env = EnvOpenOptions::new()
             .map_size(10 * 1024 * 1024) // 10MB
@@ -107,24 +105,14 @@ mod tests {
             .open(env_path)
             .unwrap();
 
-        println!("created env options");
-
         let mut wtxn = env.write_txn().unwrap();
-
-        println!("got mut wtxn");
 
         let test: Database<Str, Str> = env
             .create_database_with_txn(Some("text"), &mut wtxn)
             .unwrap();
-        println!("created test database");
 
-        let r = test.put(&mut wtxn, "I am here", "to test things");
-        if r.is_err() {
-            println!("put err: {:?}", r);
-        }
-
-        let r = wtxn.commit();
-        println!("r: {:?}", r);
+        let _r = test.put(&mut wtxn, "I am here", "to test things");
+        let _r = wtxn.commit();
     }
 
     #[test]

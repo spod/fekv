@@ -212,6 +212,7 @@ impl RaftDB {
         _ = wtxn.commit();
         // TODO error handling and appropriate returns
     }
+
     pub fn append(&mut self, ents: &[Entry]) -> Result<(), heed::Error> {
         if ents.is_empty() {
             return Ok(());
@@ -238,6 +239,32 @@ impl RaftDB {
             let r = self.entries.put(&mut wtxn, &e.index, &er);
         }
         _ = wtxn.commit();
+        Ok(())
+    }
+
+    pub fn compact(&mut self, compact_index: u64) -> Result<(), heed::Error> {
+        // remove any log entries up to compact_index
+        if compact_index <= self.first_index() {
+            // Don't need to treat this case as an error.
+            return Ok(());
+        }
+
+        if compact_index > self.last_index() + 1 {
+            panic!(
+                "compact not received raft logs: {}, last index: {}",
+                compact_index,
+                self.last_index()
+            );
+        }
+
+        if let Ok(entry) = self.get_entry(self.first_index()) {
+            let mut wtxn = self.env.write_txn().unwrap();
+            for k in self.first_index()..compact_index {
+                let _r = self.entries.delete(&mut wtxn, &k);
+            }
+            _ = wtxn.commit();
+        }
+        // TODO error handling and appropriate returns
         Ok(())
     }
 
@@ -557,9 +584,10 @@ mod test {
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
         let storage = temp_store_with_entries(&ents);
         assert_eq!(storage.first_index(), Ok(3));
-        // TODO uncomment after we implement compact(...)
-        // storage.wl().compact(4).unwrap();
-        // assert_eq!(storage.first_index(), Ok(4));
+        storage.wl().compact(4).unwrap();
+        assert_eq!(storage.first_index(), Ok(4));
+        storage.wl().compact(5).unwrap();
+        assert_eq!(storage.first_index(), Ok(5));
     }
 
     #[test]

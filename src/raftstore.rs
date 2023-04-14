@@ -42,7 +42,7 @@ const DB_STORE_SIZE: usize = 1_073_741_824;
 // protobuf fields (unknown_fields, cached_size)
 // and heed::Database<...> declaration - where does #[serde(with = "EntryRef")] go?
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct EntryRef {
     pub entry_type: EntryTypeRef,
     pub term: u64,
@@ -52,7 +52,7 @@ struct EntryRef {
     pub sync_log: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum EntryTypeRef {
     EntryNormal = 0,
     EntryConfChange = 1,
@@ -161,11 +161,16 @@ impl RaftDB {
         }
     }
 
-    fn get_entry(&self, idx: u64) -> Entry {
+    fn get_entry(&self, idx: u64) -> Result<Entry, heed::Error> {
         let rtxn = self.env.read_txn().unwrap();
         let res = self.entries.get(&rtxn, &idx);
-        let er = res.unwrap().unwrap();
-        er.to_entry()
+        match res {
+            Ok(e) => match e {
+                Some(e) => return Ok(e.to_entry()),
+                None => return Err(heed::Error::DatabaseClosing),
+            },
+            Err(err) => return Err(err),
+        }
     }
 
     fn set_entry(&self, idx: u64, e: Entry) {
@@ -180,6 +185,13 @@ impl RaftDB {
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.put(&mut wtxn, &idx, &er);
         _ = wtxn.commit();
+        // TODO error handling and appropriate returns
+    }
+
+    fn clear(&self) {
+        let mut wtxn = self.env.write_txn().unwrap();
+        let r = self.entries.clear(&mut wtxn);
+        println!("clear: {:?}", r);
     }
 }
 
@@ -249,7 +261,13 @@ impl Storage for RaftDiskStorage {
         if idx > core.last_index() {
             return Err(Error::Store(StorageError::Unavailable));
         }
-        Ok(core.get_entry(idx - offset).term)
+        // note we store using idx as key in backing store, rather than
+        // using a vec! in memory - so no need to use (idx - offset)
+        let res = core.get_entry(idx);
+        match res {
+            Ok(e) => Ok(e.term),
+            Err(err) => Err(Error::Store(StorageError::Unavailable)),
+        }
     }
 
     fn first_index(&self) -> raft::Result<u64> {
@@ -268,7 +286,8 @@ impl Storage for RaftDiskStorage {
 #[cfg(test)]
 mod test {
 
-    // tests from https://github.com/tikv/raft-rs/blob/master/src/storage.rs
+    // where noted tests are based on tests from:
+    // https://github.com/tikv/raft-rs/blob/master/src/storage.rs
 
     use raft::eraftpb::{ConfState, Entry, Snapshot};
 
@@ -283,27 +302,40 @@ mod test {
 
     #[test]
     fn test_storage_term() {
+        // note this is based on an equivalent test in raft-rs/storage.rs
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
         let mut tests = vec![
-            (2, Err(())),
+            (2, Err("err")),
             (3, Ok(3)),
             (4, Ok(4)),
             (5, Ok(5)),
-            (6, Err(())),
+            (6, Err("err")),
         ];
 
-        for (i, (idx, wterm)) in tests.drain(..).enumerate() {
-            let storage = RaftDiskStorage::new();
-            for e in ents.clone().drain(..).enumerate() {
-                let core = storage.wl();
-                core.set_entry(e.0 as u64, e.1);
-            }
+        let storage = RaftDiskStorage::new();
+        storage.wl().clear();
+        for (_, e) in ents.clone().drain(..).enumerate() {
+            let core = storage.wl();
+            core.set_entry(e.index as u64, e);
+        }
 
+        for (i, (idx, wterm)) in tests.drain(..).enumerate() {
             let t = storage.term(idx);
-            // if t != wterm {
-            //     panic!("#{}: expect res {:?}, got {:?}", i, wterm, t);
-            // }
-            println!("#{}: expect res {:?}, got {:?}", i, wterm, t);
+            // raft errors are crate private so just check if we got any err when we expect an error
+            if wterm.is_err() && !t.is_err() {
+                panic!("#{}: expect res {:?}, got {:?}", i, wterm, t);
+            }
+            if wterm.is_ok() {
+                let tmpt = t.as_ref().ok();
+                let tmpw = wterm.as_ref().ok();
+                if tmpt != tmpw {
+                    panic!("#{}: expect res {:?}, got {:?}", i, wterm, t);
+                }
+            }
+            println!(
+                "DEBUG: #{} - {}: expect res {:?}, got {:?}",
+                i, idx, wterm, t
+            );
         }
     }
 }

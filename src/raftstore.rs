@@ -144,7 +144,10 @@ impl RaftDB {
             return self.snapshot_metadata.index + 1;
         }
         match r.unwrap() {
-            Some(e) => e.0,
+            Some(e) => {
+                assert_eq!(e.0, e.1.index);
+                e.0
+            }
             None => self.snapshot_metadata.index + 1,
         }
     }
@@ -156,7 +159,10 @@ impl RaftDB {
             return self.snapshot_metadata.index + 1;
         }
         match r.unwrap() {
-            Some(e) => e.0,
+            Some(e) => {
+                assert_eq!(e.0, e.1.index);
+                e.0
+            }
             None => self.snapshot_metadata.index + 1,
         }
     }
@@ -188,6 +194,7 @@ impl RaftDB {
         // TODO error handling and appropriate returns
     }
 
+    // this should only be used in test setup etc
     fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.clear(&mut wtxn);
@@ -289,9 +296,10 @@ mod test {
     // where noted tests are based on tests from:
     // https://github.com/tikv/raft-rs/blob/master/src/storage.rs
 
-    use raft::eraftpb::{ConfState, Entry, Snapshot};
-
     use super::{RaftDiskStorage, Storage};
+    use protobuf::Message as PbMessage;
+    use raft::eraftpb::{ConfState, Entry, Snapshot};
+    use raft::GetEntriesContext;
 
     fn new_entry(index: u64, term: u64) -> Entry {
         let mut e = Entry::default();
@@ -302,7 +310,7 @@ mod test {
 
     #[test]
     fn test_storage_term() {
-        // note this is based on an equivalent test in raft-rs/storage.rs
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
         let mut tests = vec![
             (2, Err("err")),
@@ -336,6 +344,75 @@ mod test {
                 "DEBUG: #{} - {}: expect res {:?}, got {:?}",
                 i, idx, wterm, t
             );
+        }
+    }
+
+    #[test]
+    fn test_storage_entries() {
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
+        let ents = vec![
+            new_entry(3, 3),
+            new_entry(4, 4),
+            new_entry(5, 5),
+            new_entry(6, 6),
+        ];
+        let max_u64 = u64::max_value();
+        let mut tests = vec![
+            (2, 6, max_u64, Err("err")),
+            (3, 4, max_u64, Ok(vec![new_entry(3, 3)])),
+            (4, 5, max_u64, Ok(vec![new_entry(4, 4)])),
+            (4, 6, max_u64, Ok(vec![new_entry(4, 4), new_entry(5, 5)])),
+            (
+                4,
+                7,
+                max_u64,
+                Ok(vec![new_entry(4, 4), new_entry(5, 5), new_entry(6, 6)]),
+            ),
+            // even if maxsize is zero, the first entry should be returned
+            (4, 7, 0, Ok(vec![new_entry(4, 4)])),
+            // limit to 2
+            (
+                4,
+                7,
+                // u64::from(size_of(&ents[1]) + size_of(&ents[2])),
+                8 as u64,
+                Ok(vec![new_entry(4, 4), new_entry(5, 5)]),
+            ),
+            (
+                4,
+                7,
+                // u64::from(size_of(&ents[1]) + size_of(&ents[2]) + size_of(&ents[3]) / 2),
+                10 as u64,
+                Ok(vec![new_entry(4, 4), new_entry(5, 5)]),
+            ),
+            (
+                4,
+                7,
+                // u64::from(size_of(&ents[1]) + size_of(&ents[2]) + size_of(&ents[3]) - 1),
+                11 as u64,
+                Ok(vec![new_entry(4, 4), new_entry(5, 5)]),
+            ),
+            // all
+            (
+                4,
+                7,
+                // u64::from(size_of(&ents[1]) + size_of(&ents[2]) + size_of(&ents[3])),
+                12 as u64,
+                Ok(vec![new_entry(4, 4), new_entry(5, 5), new_entry(6, 6)]),
+            ),
+        ];
+        let storage = RaftDiskStorage::new();
+        storage.wl().clear();
+        for (_, e) in ents.clone().drain(..).enumerate() {
+            let core = storage.wl();
+            core.set_entry(e.index as u64, e);
+        }
+        for (i, (lo, hi, maxsize, wentries)) in tests.drain(..).enumerate() {
+            let e = storage.entries(lo, hi, maxsize, GetEntriesContext::empty(false));
+            // if e != wentries {
+            //     panic!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
+            // }
+            println!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
         }
     }
 }

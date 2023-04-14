@@ -144,6 +144,25 @@ impl RaftDB {
         }
     }
 
+    pub fn new_with_db_path(db_path: &std::path::Path) -> RaftDB {
+        let db_path = Path::join(db_path, &DB_ENV);
+        _ = create_dir_all(&db_path);
+        let env = EnvOpenOptions::new()
+            .map_size(DB_STORE_SIZE) // 10MB
+            .max_dbs(3)
+            .open(db_path)
+            .unwrap();
+        let entries = env.create_database(Some(&DB_ENTRIES)).unwrap();
+        let raft_state = RaftState::new(HardState::new(), ConfState::new());
+        // TODO write initial raft_state to conf database, for now we use raft::storage::RaftState;
+        RaftDB {
+            env: env,
+            entries: entries,
+            raft_state: raft_state,
+            snapshot_metadata: SnapshotMetadata::new(),
+        }
+    }
+
     fn first_index(&self) -> u64 {
         let rtxn = self.env.read_txn().unwrap();
         let r = self.entries.first(&rtxn);
@@ -239,6 +258,12 @@ impl RaftDiskStorage {
     pub fn new() -> RaftDiskStorage {
         RaftDiskStorage {
             raftdb: Arc::new(RwLock::new(RaftDB::new())),
+        }
+    }
+
+    pub fn new_with_db_path(db_path: &std::path::Path) -> RaftDiskStorage {
+        RaftDiskStorage {
+            raftdb: Arc::new(RwLock::new(RaftDB::new_with_db_path(db_path))),
         }
     }
 
@@ -384,9 +409,9 @@ mod test {
     // https://github.com/tikv/raft-rs/blob/master/src/storage.rs
 
     use super::{RaftDiskStorage, Storage};
-    use protobuf::Message as PbMessage;
     use raft::eraftpb::{ConfState, Entry, Snapshot};
     use raft::GetEntriesContext;
+    use tempfile::tempdir;
 
     fn new_entry(index: u64, term: u64) -> Entry {
         let mut e = Entry::default();
@@ -407,7 +432,8 @@ mod test {
             (6, Err("err")),
         ];
 
-        let storage = RaftDiskStorage::new();
+        let tmp = tempdir().unwrap();
+        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
         storage.wl().clear();
         for (_, e) in ents.clone().drain(..).enumerate() {
             let core = storage.wl();
@@ -484,7 +510,8 @@ mod test {
                 Ok(vec![new_entry(4, 4), new_entry(5, 5), new_entry(6, 6)]),
             ),
         ];
-        let storage = RaftDiskStorage::new();
+        let tmp = tempdir().unwrap();
+        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
         storage.wl().clear();
         for (_, e) in ents.clone().drain(..).enumerate() {
             let core = storage.wl();
@@ -502,7 +529,6 @@ mod test {
                     panic!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
                 }
             }
-            println!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
         }
     }
 
@@ -510,7 +536,8 @@ mod test {
     fn test_storage_last_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = RaftDiskStorage::new();
+        let tmp = tempdir().unwrap();
+        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
         storage.wl().clear();
         for (_, e) in ents.clone().drain(..).enumerate() {
             let core = storage.wl();
@@ -534,7 +561,8 @@ mod test {
     fn test_storage_first_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = RaftDiskStorage::new();
+        let tmp = tempdir().unwrap();
+        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
         storage.wl().clear();
         for (_, e) in ents.clone().drain(..).enumerate() {
             let core = storage.wl();

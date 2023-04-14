@@ -12,5 +12,6 @@ hyper = { version = "0.14", features = ["full"] }
 protobuf = "3.2.0"
 raft = "0.7.0"
 serde = "1.0.160"
+tempfile = "3.5.0"
 tokio = { version = "1", features = ["full"] }
 url = "2.3.1"

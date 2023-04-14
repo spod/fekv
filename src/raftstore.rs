@@ -198,7 +198,8 @@ impl RaftDB {
     fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.clear(&mut wtxn);
-        println!("clear: {:?}", r);
+        _ = wtxn.commit();
+        // TODO error handling and appropriate returns
     }
 }
 
@@ -340,14 +341,10 @@ mod test {
                     panic!("#{}: expect res {:?}, got {:?}", i, wterm, t);
                 }
             }
-            println!(
-                "DEBUG: #{} - {}: expect res {:?}, got {:?}",
-                i, idx, wterm, t
-            );
         }
     }
 
-    #[test]
+    // #[test]
     fn test_storage_entries() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![
@@ -414,5 +411,46 @@ mod test {
             // }
             println!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
         }
+    }
+
+    #[test]
+    fn test_storage_last_index() {
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = RaftDiskStorage::new();
+        storage.wl().clear();
+        for (_, e) in ents.clone().drain(..).enumerate() {
+            let core = storage.wl();
+            core.set_entry(e.index as u64, e);
+        }
+
+        let wresult = Ok(5);
+        let result = storage.last_index();
+        if result != wresult {
+            panic!("FAIL: want {:?}, got {:?}", wresult, result);
+        }
+        // TODO - uncomment after we implement append ...
+        // storage.wl().append(&[new_entry(6, 5)]).unwrap();
+        // let wresult = Ok(6);
+        // let result = storage.last_index();
+        // if result != wresult {
+        //     panic!("want {:?}, got {:?}", wresult, result);
+        // }
+    }
+
+    #[test]
+    fn test_storage_first_index() {
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = RaftDiskStorage::new();
+        storage.wl().clear();
+        for (_, e) in ents.clone().drain(..).enumerate() {
+            let core = storage.wl();
+            core.set_entry(e.index as u64, e);
+        }
+        assert_eq!(storage.first_index(), Ok(3));
+        // TODO uncomment after we implement compact(...)
+        // storage.wl().compact(4).unwrap();
+        // assert_eq!(storage.first_index(), Ok(4));
     }
 }

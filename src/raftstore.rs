@@ -591,6 +591,41 @@ mod test {
     }
 
     #[test]
+    fn test_storage_compact() {
+        // note this is a test from tikv/raft-rs/storage.rs with some modifications
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&ents);
+
+        let mut tests = vec![(2, 3, 3, 3), (3, 3, 3, 3), (4, 4, 4, 2), (5, 5, 5, 1)];
+        for (i, (idx, windex, wterm, wlen)) in tests.drain(..).enumerate() {
+            storage.wl().compact(idx).unwrap();
+            let index = storage.first_index().unwrap();
+            if index != windex {
+                panic!("#{}: want {}, index {}", i, windex, index);
+            }
+            let term = if let Ok(v) =
+                storage.entries(index, index + 1, 1, GetEntriesContext::empty(false))
+            {
+                v.first().map_or(0, |e| e.term)
+            } else {
+                0
+            };
+            if term != wterm {
+                panic!("#{}: want {}, term {}", i, wterm, term);
+            }
+            let last = storage.last_index().unwrap();
+            let len = storage
+                .entries(index, last + 1, 100, GetEntriesContext::empty(false))
+                .unwrap()
+                .len();
+            if len != wlen {
+                panic!("#{}: want {}, term {}", i, wlen, len);
+            }
+        }
+    }
+
+
+    #[test]
     fn test_storage_append() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];

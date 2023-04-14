@@ -26,7 +26,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use heed::types::{ByteSlice, OwnedType, SerdeBincode, SerdeJson, Str};
 use heed::{Database, Env, EnvOpenOptions};
-use protobuf::Message as PbMessage;
+
 use raft::prelude::*;
 use raft::{Error, StorageError};
 use serde::{Deserialize, Serialize};
@@ -269,23 +269,8 @@ impl RaftDiskStorage {
     }
 }
 
-// From https://github.com/tikv/raft-rs/blob/master/src/util.rs
-// Note this isn't working due to trait bounds error
-//
-// error[E0277]: the trait bound `raft::prelude::Entry: protobuf::Message` is not satisfied
-//    --> src/raftstore.rs:333:20
-//     |
-// 333 |         limit_size(&mut ents, max_size);
-//     |         ---------- ^^^^^^^^^ the trait `protobuf::Message` is not implemented for `raft::prelude::Entry`
-//     |         |
-//     |         required by a bound introduced by this call
-//
-//
-// Need to either fix trait bound error and/or
-// hack together enough of a compute_size(...) function to work
-// see eg https://github.com/stepancheg/rust-protobuf/blob/master/protobuf/src/well_known_types/wrappers.rs#L87-L98
-//
-pub fn limit_size<T: PbMessage + Clone>(entries: &mut Vec<T>, max: Option<u64>) {
+// From https://github.com/tikv/raft-rs/blob/master/src/util.rs with modifications
+pub fn limit_size(entries: &mut Vec<Entry>, max: Option<u64>) {
     if entries.len() <= 1 {
         return;
     }
@@ -299,15 +284,19 @@ pub fn limit_size<T: PbMessage + Clone>(entries: &mut Vec<T>, max: Option<u64>) 
         .iter()
         .take_while(|&e| {
             if size == 0 {
-                size += u64::from(e.compute_size());
+                size += u64::from(compute_size(e));
                 return true;
             }
-            size += u64::from(e.compute_size());
+            size += u64::from(compute_size(e));
             size <= max
         })
         .count();
-
     entries.truncate(limit);
+}
+
+fn compute_size(ent: &Entry) -> u32 {
+    // hack
+    ent.data.len() as u32 + ent.context.len() as u32 + 4 as u32
 }
 
 impl Storage for RaftDiskStorage {
@@ -342,7 +331,7 @@ impl Storage for RaftDiskStorage {
             let e = core.get_entry(k as u64);
             ents.push(core.get_entry(k as u64).unwrap());
         }
-        // limit_size(&mut ents, max_size);
+        limit_size(&mut ents, max_size);
         Ok(ents)
     }
 

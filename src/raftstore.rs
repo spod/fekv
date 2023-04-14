@@ -103,6 +103,17 @@ impl EntryRef {
             sync_log: e.sync_log,
         }
     }
+
+    pub fn new() -> EntryRef {
+        EntryRef {
+            entry_type: EntryTypeRef::EntryNormal,
+            term: 0,
+            index: 0,
+            data: ::bytes::Bytes::new(),
+            context: ::bytes::Bytes::new(),
+            sync_log: false,
+        }
+    }
 }
 
 pub struct RaftDB {
@@ -175,14 +186,7 @@ impl RaftDB {
     }
 
     fn set_entry(&self, idx: u64, e: Entry) {
-        let er = EntryRef {
-            entry_type: EntryTypeRef::EntryNormal.from_entry_type(e.entry_type),
-            term: e.term,
-            index: e.index,
-            data: e.data.to_owned(),
-            context: e.context.to_owned(),
-            sync_log: e.sync_log,
-        };
+        let er = EntryRef::new().from_entry(e);
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.put(&mut wtxn, &idx, &er);
         _ = wtxn.commit();
@@ -210,14 +214,7 @@ impl RaftDB {
         // Append all entries from `ents`.
         let mut wtxn = self.env.write_txn().unwrap();
         for (_, e) in ents.into_iter().enumerate() {
-            let er = EntryRef {
-                entry_type: EntryTypeRef::EntryNormal.from_entry_type(e.entry_type),
-                term: e.term,
-                index: e.index,
-                data: e.data.to_owned(),
-                context: e.context.to_owned(),
-                sync_log: e.sync_log,
-            };
+            let er = EntryRef::new().from_entry(e.clone());
             let r = self.entries.put(&mut wtxn, &e.index, &er);
         }
         _ = wtxn.commit();
@@ -283,7 +280,29 @@ impl Storage for RaftDiskStorage {
         max_size: impl Into<Option<u64>>,
         context: raft::GetEntriesContext,
     ) -> raft::Result<Vec<raft::prelude::Entry>> {
-        todo!()
+        let max_size = max_size.into();
+        let core = self.rl();
+        if low < core.first_index() {
+            return Err(Error::Store(StorageError::Compacted));
+        }
+
+        if high > core.last_index() + 1 {
+            panic!(
+                "index out of bound (last: {}, high: {})",
+                core.last_index() + 1,
+                high
+            );
+        }
+
+        let mut ents: Vec<Entry> = std::vec::Vec::new();
+
+        for k in low..high {
+            let e = core.get_entry(k as u64);
+            ents.push(core.get_entry(k as u64).unwrap());
+        }
+        // TODO FIXME
+        // limit_size(&mut ents, max_size);
+        Ok(ents)
     }
 
     fn term(&self, idx: u64) -> raft::Result<u64> {
@@ -374,7 +393,7 @@ mod test {
         }
     }
 
-    // #[test]
+    #[test]
     fn test_storage_entries() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![
@@ -436,9 +455,16 @@ mod test {
         }
         for (i, (lo, hi, maxsize, wentries)) in tests.drain(..).enumerate() {
             let e = storage.entries(lo, hi, maxsize, GetEntriesContext::empty(false));
-            // if e != wentries {
-            //     panic!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
-            // }
+            if e.is_err() && !wentries.is_err() {
+                panic!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
+            }
+            if wentries.is_ok() {
+                let tmpe = e.as_ref().ok();
+                let tmpw = wentries.as_ref().ok();
+                if tmpe != tmpw {
+                    panic!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
+                }
+            }
             println!("#{}: expect entries {:?}, got {:?}", i, wentries, e);
         }
     }

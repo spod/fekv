@@ -413,7 +413,7 @@ mod test {
     use raft::GetEntriesContext;
     use tempfile::tempdir;
 
-    fn temp_store_with_entries(ents: &mut Vec<Entry>) -> RaftDiskStorage {
+    fn temp_store_with_entries(ents: &Vec<Entry>) -> RaftDiskStorage {
         let tmp = tempdir().unwrap();
         let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
         storage.wl().clear();
@@ -434,8 +434,8 @@ mod test {
     #[test]
     fn test_storage_term() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = temp_store_with_entries(&mut ents);
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&ents);
 
         let mut tests = vec![
             (2, Err("err")),
@@ -464,13 +464,13 @@ mod test {
     #[test]
     fn test_storage_entries() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let mut ents = vec![
+        let ents = vec![
             new_entry(3, 3),
             new_entry(4, 4),
             new_entry(5, 5),
             new_entry(6, 6),
         ];
-        let storage = temp_store_with_entries(&mut ents);
+        let storage = temp_store_with_entries(&ents);
         let max_u64 = u64::max_value();
         let mut tests = vec![
             (2, 6, max_u64, Err("err")),
@@ -534,8 +534,8 @@ mod test {
     #[test]
     fn test_storage_last_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = temp_store_with_entries(&mut ents);
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&ents);
         let wresult = Ok(5);
         let result = storage.last_index();
         if result != wresult {
@@ -552,8 +552,8 @@ mod test {
     #[test]
     fn test_storage_first_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = temp_store_with_entries(&mut ents);
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&ents);
         assert_eq!(storage.first_index(), Ok(3));
         // TODO uncomment after we implement compact(...)
         // storage.wl().compact(4).unwrap();

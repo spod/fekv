@@ -413,6 +413,17 @@ mod test {
     use raft::GetEntriesContext;
     use tempfile::tempdir;
 
+    fn temp_store_with_entries(ents: &mut Vec<Entry>) -> RaftDiskStorage {
+        let tmp = tempdir().unwrap();
+        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
+        storage.wl().clear();
+        for (_, e) in ents.clone().drain(..).enumerate() {
+            let core = storage.wl();
+            core.set_entry(e.index as u64, e);
+        }
+        storage
+    }
+
     fn new_entry(index: u64, term: u64) -> Entry {
         let mut e = Entry::default();
         e.term = term;
@@ -423,7 +434,9 @@ mod test {
     #[test]
     fn test_storage_term() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&mut ents);
+
         let mut tests = vec![
             (2, Err("err")),
             (3, Ok(3)),
@@ -431,14 +444,6 @@ mod test {
             (5, Ok(5)),
             (6, Err("err")),
         ];
-
-        let tmp = tempdir().unwrap();
-        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
-        storage.wl().clear();
-        for (_, e) in ents.clone().drain(..).enumerate() {
-            let core = storage.wl();
-            core.set_entry(e.index as u64, e);
-        }
 
         for (i, (idx, wterm)) in tests.drain(..).enumerate() {
             let t = storage.term(idx);
@@ -459,12 +464,13 @@ mod test {
     #[test]
     fn test_storage_entries() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let ents = vec![
+        let mut ents = vec![
             new_entry(3, 3),
             new_entry(4, 4),
             new_entry(5, 5),
             new_entry(6, 6),
         ];
+        let storage = temp_store_with_entries(&mut ents);
         let max_u64 = u64::max_value();
         let mut tests = vec![
             (2, 6, max_u64, Err("err")),
@@ -510,13 +516,6 @@ mod test {
                 Ok(vec![new_entry(4, 4), new_entry(5, 5), new_entry(6, 6)]),
             ),
         ];
-        let tmp = tempdir().unwrap();
-        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
-        storage.wl().clear();
-        for (_, e) in ents.clone().drain(..).enumerate() {
-            let core = storage.wl();
-            core.set_entry(e.index as u64, e);
-        }
         for (i, (lo, hi, maxsize, wentries)) in tests.drain(..).enumerate() {
             let e = storage.entries(lo, hi, maxsize, GetEntriesContext::empty(false));
             if e.is_err() && !wentries.is_err() {
@@ -535,15 +534,8 @@ mod test {
     #[test]
     fn test_storage_last_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let tmp = tempdir().unwrap();
-        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
-        storage.wl().clear();
-        for (_, e) in ents.clone().drain(..).enumerate() {
-            let core = storage.wl();
-            core.set_entry(e.index as u64, e);
-        }
-
+        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&mut ents);
         let wresult = Ok(5);
         let result = storage.last_index();
         if result != wresult {
@@ -560,14 +552,8 @@ mod test {
     #[test]
     fn test_storage_first_index() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
-        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let tmp = tempdir().unwrap();
-        let storage = RaftDiskStorage::new_with_db_path(tmp.as_ref());
-        storage.wl().clear();
-        for (_, e) in ents.clone().drain(..).enumerate() {
-            let core = storage.wl();
-            core.set_entry(e.index as u64, e);
-        }
+        let mut ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let storage = temp_store_with_entries(&mut ents);
         assert_eq!(storage.first_index(), Ok(3));
         // TODO uncomment after we implement compact(...)
         // storage.wl().compact(4).unwrap();

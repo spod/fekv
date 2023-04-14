@@ -24,7 +24,7 @@ use std::fs::create_dir_all;
 use std::path::Path;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use heed::types::{ByteSlice, OwnedType, SerdeBincode, Str};
+use heed::types::{ByteSlice, OwnedType, SerdeBincode, SerdeJson, Str};
 use heed::{Database, Env, EnvOpenOptions};
 use raft::prelude::*;
 use raft::{Error, StorageError};
@@ -36,12 +36,7 @@ const DB_ENV: &str = "raft.mdb";
 const DB_PATH: &str = "./data";
 const DB_STORE_SIZE: usize = 1_073_741_824;
 
-// Serde compatible clones of raft::Entry/EntryType
-// TODO need to write some helpers to map to/from Entry as can't figure
-// out how to make Serde remote derive work with both raft::Entry special
-// protobuf fields (unknown_fields, cached_size)
-// and heed::Database<...> declaration - where does #[serde(with = "EntryRef")] go?
-
+// Versions of raft::Entry/EntryType which implement Serialize & Deserialize
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct EntryRef {
     pub entry_type: EntryTypeRef,
@@ -112,7 +107,7 @@ impl EntryRef {
 
 pub struct RaftDB {
     env: Env,
-    entries: Database<OwnedType<u64>, SerdeBincode<EntryRef>>,
+    entries: Database<OwnedType<u64>, SerdeJson<EntryRef>>, // SerdeBincode
     raft_state: RaftState,
     snapshot_metadata: SnapshotMetadata,
 }
@@ -192,6 +187,41 @@ impl RaftDB {
         let r = self.entries.put(&mut wtxn, &idx, &er);
         _ = wtxn.commit();
         // TODO error handling and appropriate returns
+    }
+    pub fn append(&mut self, ents: &[Entry]) -> Result<(), heed::Error> {
+        if ents.is_empty() {
+            return Ok(());
+        }
+        if self.first_index() > ents[0].index {
+            panic!(
+                "overwrite compacted raft logs, compacted: {}, append: {}",
+                self.first_index() - 1,
+                ents[0].index,
+            );
+        }
+        if self.last_index() + 1 < ents[0].index {
+            panic!(
+                "raft logs should be continuous, last index: {}, new appended: {}",
+                self.last_index(),
+                ents[0].index,
+            );
+        }
+
+        // Append all entries from `ents`.
+        let mut wtxn = self.env.write_txn().unwrap();
+        for (_, e) in ents.into_iter().enumerate() {
+            let er = EntryRef {
+                entry_type: EntryTypeRef::EntryNormal.from_entry_type(e.entry_type),
+                term: e.term,
+                index: e.index,
+                data: e.data.to_owned(),
+                context: e.context.to_owned(),
+                sync_log: e.sync_log,
+            };
+            let r = self.entries.put(&mut wtxn, &e.index, &er);
+        }
+        _ = wtxn.commit();
+        Ok(())
     }
 
     // this should only be used in test setup etc
@@ -429,13 +459,12 @@ mod test {
         if result != wresult {
             panic!("FAIL: want {:?}, got {:?}", wresult, result);
         }
-        // TODO - uncomment after we implement append ...
-        // storage.wl().append(&[new_entry(6, 5)]).unwrap();
-        // let wresult = Ok(6);
-        // let result = storage.last_index();
-        // if result != wresult {
-        //     panic!("want {:?}, got {:?}", wresult, result);
-        // }
+        storage.wl().append(&[new_entry(6, 5)]).unwrap();
+        let wresult = Ok(6);
+        let result = storage.last_index();
+        if result != wresult {
+            panic!("want {:?}, got {:?}", wresult, result);
+        }
     }
 
     #[test]

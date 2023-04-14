@@ -372,6 +372,13 @@ impl Storage for RaftDiskStorage {
 
 #[cfg(test)]
 mod test {
+    // Running all tests may fail due to shared backing DB across threads
+    //
+    // TODO RaftDiskStorage needs configurable env and tests should have
+    // a per test tmp backing env
+    //
+    // "Fix" intermittent test failures with:
+    // $ cargo test -- --test-threads=1
 
     // where noted tests are based on tests from:
     // https://github.com/tikv/raft-rs/blob/master/src/storage.rs

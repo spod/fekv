@@ -20,6 +20,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
+use std::cmp;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -122,6 +123,7 @@ pub struct RaftDB {
     entries: Database<OwnedType<u64>, SerdeJson<EntryRef>>, // SerdeBincode
     raft_state: RaftState,
     snapshot_metadata: SnapshotMetadata,
+    trigger_snap_unavailable: bool,
 }
 
 impl RaftDB {
@@ -141,6 +143,7 @@ impl RaftDB {
             entries: entries,
             raft_state: raft_state,
             snapshot_metadata: SnapshotMetadata::new(),
+            trigger_snap_unavailable: false,
         }
     }
 
@@ -160,6 +163,7 @@ impl RaftDB {
             entries: entries,
             raft_state: raft_state,
             snapshot_metadata: SnapshotMetadata::new(),
+            trigger_snap_unavailable: false,
         }
     }
 
@@ -268,12 +272,35 @@ impl RaftDB {
         Ok(())
     }
 
+    fn snapshot(&self) -> Snapshot {
+        let mut snapshot = Snapshot::default();
+        let meta = snapshot.mut_metadata();
+        meta.index = self.raft_state.hard_state.commit;
+        // update snapshot term if committed hard_state is greater than current snapshot term
+        meta.term = match meta.index.cmp(&self.snapshot_metadata.index) {
+            cmp::Ordering::Equal => self.snapshot_metadata.term,
+            cmp::Ordering::Greater => self.get_entry(meta.index).unwrap().term,
+            cmp::Ordering::Less => {
+                panic!(
+                    "commit {} < snapshot_metadata.index {}",
+                    meta.index, self.snapshot_metadata.index
+                );
+            }
+        };
+        meta.set_conf_state(self.raft_state.conf_state.clone());
+        snapshot
+    }
+
     // this should only be used in test setup etc
     fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.clear(&mut wtxn);
         _ = wtxn.commit();
         // TODO error handling and appropriate returns
+    }
+
+    pub fn trigger_snap_unavailable(&mut self) {
+        self.trigger_snap_unavailable = true;
     }
 }
 
@@ -418,7 +445,17 @@ impl Storage for RaftDiskStorage {
     }
 
     fn snapshot(&self, request_index: u64, to: u64) -> raft::Result<raft::prelude::Snapshot> {
-        todo!()
+        let mut core = self.wl();
+        if core.trigger_snap_unavailable {
+            core.trigger_snap_unavailable = false;
+            Err(Error::Store(StorageError::SnapshotTemporarilyUnavailable))
+        } else {
+            let mut snap = core.snapshot();
+            if snap.get_metadata().index < request_index {
+                snap.mut_metadata().index = request_index;
+            }
+            Ok(snap)
+        }
     }
 }
 
@@ -458,6 +495,14 @@ mod test {
         e.term = term;
         e.index = index;
         e
+    }
+
+    fn new_snapshot(index: u64, term: u64, voters: Vec<u64>) -> Snapshot {
+        let mut s = Snapshot::default();
+        s.mut_metadata().index = index;
+        s.mut_metadata().term = term;
+        s.mut_metadata().mut_conf_state().voters = voters;
+        s
     }
 
     #[test]
@@ -624,6 +669,41 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_storage_create_snapshot() {
+        let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
+        let nodes = vec![1, 2, 3];
+        let mut conf_state = ConfState::default();
+        conf_state.voters = nodes.clone();
+
+        let unavailable = Err("err");
+        let mut tests = vec![
+            (4, Ok(new_snapshot(4, 4, nodes.clone())), 0),
+            (5, Ok(new_snapshot(5, 5, nodes.clone())), 5),
+            (5, Ok(new_snapshot(6, 5, nodes)), 6),
+            (5, unavailable, 6),
+        ];
+        for (i, (idx, wresult, windex)) in tests.drain(..).enumerate() {
+            let storage = temp_store_with_entries(&ents);
+            storage.wl().raft_state.hard_state.commit = idx;
+            storage.wl().raft_state.hard_state.term = idx;
+            storage.wl().raft_state.conf_state = conf_state.clone();
+
+            if wresult.is_err() {
+                storage.wl().trigger_snap_unavailable();
+            }
+
+            let result = storage.snapshot(windex, 0);
+            if wresult.is_err() && !result.is_err() {
+                panic!("#{}: want {:?}, got {:?}", i, wresult, result);
+            }
+            if wresult.is_ok() {
+                if result.as_ref().unwrap() != wresult.as_ref().unwrap() {
+                    panic!("#{}: want {:?}, got {:?}", i, wresult, result);
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_storage_append() {
@@ -680,7 +760,10 @@ mod test {
             let res = panic::catch_unwind(AssertUnwindSafe(|| storage.wl().append(&entries)));
             if let Some(wentries) = wentries {
                 let _ = res.unwrap();
-                let e = &storage.entries(3, 3 + wentries.len() as u64, 100000, GetEntriesContext::empty(false)).unwrap();
+                let ctx = GetEntriesContext::empty(false);
+                let e = &storage
+                    .entries(3, 3 + wentries.len() as u64, 100, ctx)
+                    .unwrap();
                 if *e != wentries {
                     panic!("#{}: want {:?}, entries {:?}", i, wentries, e);
                 }

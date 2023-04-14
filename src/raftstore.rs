@@ -272,6 +272,27 @@ impl RaftDB {
         Ok(())
     }
 
+    pub fn apply_snapshot(&mut self, mut snapshot: Snapshot) -> Result<(), heed::Error> {
+        let mut meta = snapshot.take_metadata();
+        let index = meta.index;
+
+        if self.first_index() > index {
+            return Err(heed::Error::DatabaseClosing);
+        }
+
+        self.snapshot_metadata = meta.clone();
+
+        self.raft_state.hard_state.term = cmp::max(self.raft_state.hard_state.term, meta.term);
+        self.raft_state.hard_state.commit = index;
+
+        // clear log entries
+        self.clear();
+
+        // Update conf states.
+        self.raft_state.conf_state = meta.take_conf_state();
+        Ok(())
+    }
+
     fn snapshot(&self) -> Snapshot {
         let mut snapshot = Snapshot::default();
         let meta = snapshot.mut_metadata();
@@ -291,7 +312,7 @@ impl RaftDB {
         snapshot
     }
 
-    // this should only be used in test setup etc
+    // clear all log entries in backing db
     fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
         let r = self.entries.clear(&mut wtxn);
@@ -771,5 +792,20 @@ mod test {
                 res.unwrap_err();
             }
         }
+    }
+
+    #[test]
+    fn test_storage_apply_snapshot() {
+        let nodes = vec![1, 2, 3];
+        let e: Vec<Entry> = vec![];
+        let storage = temp_store_with_entries(&e);
+
+        // Apply snapshot successfully
+        let snap = new_snapshot(4, 4, nodes.clone());
+        storage.wl().apply_snapshot(snap).unwrap();
+
+        // Apply snapshot fails due to StorageError::SnapshotOutOfDate
+        let snap = new_snapshot(3, 3, nodes);
+        storage.wl().apply_snapshot(snap).unwrap_err();
     }
 }

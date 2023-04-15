@@ -34,6 +34,7 @@ fn main() {
     // You need to build your own persistent storage in your production.
     // Please check the Storage trait in src/storage.rs to see how to implement one.
     let storage = RaftDiskStorage::new_with_conf_state(ConfState::from((vec![1], vec![])));
+    storage.wl().clear();
 
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
@@ -109,7 +110,7 @@ fn on_ready(raft_group: &mut RawNode<RaftDiskStorage>, cbs: &mut HashMap<u8, Pro
         return;
     }
     let store = raft_group.raft.raft_log.store.clone();
-    
+
     // Get the `Ready` with `RawNode::ready` interface.
     let mut ready = raft_group.ready();
 

@@ -164,7 +164,6 @@ impl RaftDB {
         }
     }
 
-
     /// Saves the current HardState.
     pub fn set_hardstate(&mut self, hs: HardState) {
         self.raft_state.hard_state = hs;
@@ -326,7 +325,7 @@ impl RaftDB {
     }
 
     // clear all log entries in backing db
-    fn clear(&self) {
+    pub fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
         let _r = self.entries.clear(&mut wtxn);
         let _r = wtxn.commit();
@@ -337,7 +336,6 @@ impl RaftDB {
         self.trigger_snap_unavailable = true;
     }
 }
-
 
 #[derive(Clone)]
 pub struct RaftDiskStorage {

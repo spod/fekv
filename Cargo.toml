@@ -11,6 +11,7 @@ heed = "0.11.0"
 hyper = { version = "0.14", features = ["full"] }
 protobuf = "3.2.0"
 raft = "0.7.0"
+regex = "1.7.3"
 serde = "1.0.160"
 slog = "2.7.0"
 slog-async = "2.7.0"
@@ -21,4 +22,4 @@ url = "2.3.1"
 
 [[example]]
 name = "single_mem_node"
-path = "src/test/main.rs"
+path = "examples/single_mem_node/main.rs"

@@ -164,19 +164,20 @@ impl RaftDB {
         }
     }
 
-    /// Saves the current HardState.
     pub fn set_hardstate(&mut self, hs: HardState) {
         self.raft_state.hard_state = hs;
     }
 
-    /// Get the hard state.
     pub fn hard_state(&self) -> &HardState {
         &self.raft_state.hard_state
     }
 
-    /// Get the mut hard state.
     pub fn mut_hard_state(&mut self) -> &mut HardState {
         &mut self.raft_state.hard_state
+    }
+
+    pub fn set_conf_state(&mut self, cs: ConfState) {
+        self.raft_state.conf_state = cs;
     }
 
     fn first_index(&self) -> u64 {

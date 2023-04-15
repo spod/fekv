@@ -199,14 +199,14 @@ impl RaftDB {
         let rtxn = self.env.read_txn().unwrap();
         let r = self.entries.last(&rtxn);
         if r.is_err() {
-            return self.snapshot_metadata.index + 1;
+            return self.snapshot_metadata.index;
         }
         match r.unwrap() {
             Some(e) => {
                 assert_eq!(e.0, e.1.index);
                 e.0
             }
-            None => self.snapshot_metadata.index + 1,
+            None => self.snapshot_metadata.index,
         }
     }
 

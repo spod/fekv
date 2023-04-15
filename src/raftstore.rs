@@ -14,18 +14,15 @@
 //  - One DB for Config - key is config item, value is state for config
 //  See hashicorp/raft-mdb for this in go
 
-//
-// Lots TODO below so for now silence warnings:
+// TODO
 #![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 
 use std::cmp;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use heed::types::{ByteSlice, OwnedType, SerdeBincode, SerdeJson, Str};
+use heed::types::{OwnedType, SerdeJson};
 use heed::{Database, Env, EnvOpenOptions};
 
 use raft::prelude::*;
@@ -131,7 +128,7 @@ impl RaftDB {
         let db_path = Path::join(Path::new(&DB_PATH), &DB_ENV);
         _ = create_dir_all(&db_path);
         let env = EnvOpenOptions::new()
-            .map_size(DB_STORE_SIZE) // 10MB
+            .map_size(DB_STORE_SIZE)
             .max_dbs(3)
             .open(db_path)
             .unwrap();
@@ -212,8 +209,8 @@ impl RaftDB {
     fn set_entry(&self, idx: u64, e: Entry) {
         let er = EntryRef::new().from_entry(e);
         let mut wtxn = self.env.write_txn().unwrap();
-        let r = self.entries.put(&mut wtxn, &idx, &er);
-        _ = wtxn.commit();
+        let _r = self.entries.put(&mut wtxn, &idx, &er);
+        let _r = wtxn.commit();
         // TODO error handling and appropriate returns
     }
 
@@ -240,9 +237,9 @@ impl RaftDB {
         let mut wtxn = self.env.write_txn().unwrap();
         for (_, e) in ents.into_iter().enumerate() {
             let er = EntryRef::new().from_entry(e.clone());
-            let r = self.entries.put(&mut wtxn, &e.index, &er);
+            let _r = self.entries.put(&mut wtxn, &e.index, &er);
         }
-        _ = wtxn.commit();
+        let _r = wtxn.commit();
         Ok(())
     }
 
@@ -261,7 +258,7 @@ impl RaftDB {
             );
         }
 
-        if let Ok(entry) = self.get_entry(self.first_index()) {
+        if let Ok(_entry) = self.get_entry(self.first_index()) {
             let mut wtxn = self.env.write_txn().unwrap();
             for k in self.first_index()..compact_index {
                 let _r = self.entries.delete(&mut wtxn, &k);
@@ -315,8 +312,8 @@ impl RaftDB {
     // clear all log entries in backing db
     fn clear(&self) {
         let mut wtxn = self.env.write_txn().unwrap();
-        let r = self.entries.clear(&mut wtxn);
-        _ = wtxn.commit();
+        let _r = self.entries.clear(&mut wtxn);
+        let _r = wtxn.commit();
         // TODO error handling and appropriate returns
     }
 
@@ -409,7 +406,7 @@ impl Storage for RaftDiskStorage {
         low: u64,
         high: u64,
         max_size: impl Into<Option<u64>>,
-        context: raft::GetEntriesContext,
+        _context: raft::GetEntriesContext,
     ) -> raft::Result<Vec<raft::prelude::Entry>> {
         let max_size = max_size.into();
         let core = self.rl();
@@ -428,7 +425,6 @@ impl Storage for RaftDiskStorage {
         let mut ents: Vec<Entry> = std::vec::Vec::new();
 
         for k in low..high {
-            let e = core.get_entry(k as u64);
             ents.push(core.get_entry(k as u64).unwrap());
         }
         limit_size(&mut ents, max_size);
@@ -453,7 +449,7 @@ impl Storage for RaftDiskStorage {
         let res = core.get_entry(idx);
         match res {
             Ok(e) => Ok(e.term),
-            Err(err) => Err(Error::Store(StorageError::Unavailable)),
+            Err(_err) => Err(Error::Store(StorageError::Unavailable)),
         }
     }
 
@@ -465,7 +461,7 @@ impl Storage for RaftDiskStorage {
         Ok(self.rl().last_index())
     }
 
-    fn snapshot(&self, request_index: u64, to: u64) -> raft::Result<raft::prelude::Snapshot> {
+    fn snapshot(&self, request_index: u64, _to: u64) -> raft::Result<raft::prelude::Snapshot> {
         let mut core = self.wl();
         if core.trigger_snap_unavailable {
             core.trigger_snap_unavailable = false;
@@ -730,7 +726,6 @@ mod test {
     fn test_storage_append() {
         // note this is a test from tikv/raft-rs/storage.rs with some modifications
         let ents = vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)];
-        let storage = temp_store_with_entries(&ents);
         let mut tests = vec![
             (
                 vec![new_entry(3, 3), new_entry(4, 4), new_entry(5, 5)],

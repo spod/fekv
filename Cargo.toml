@@ -12,6 +12,13 @@ hyper = { version = "0.14", features = ["full"] }
 protobuf = "3.2.0"
 raft = "0.7.0"
 serde = "1.0.160"
+slog = "2.7.0"
+slog-async = "2.7.0"
+slog-term = "2.9.0"
 tempfile = "3.5.0"
 tokio = { version = "1", features = ["full"] }
 url = "2.3.1"
+
+[[example]]
+name = "single_mem_node"
+path = "src/test/main.rs"

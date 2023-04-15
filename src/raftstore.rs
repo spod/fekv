@@ -164,6 +164,22 @@ impl RaftDB {
         }
     }
 
+
+    /// Saves the current HardState.
+    pub fn set_hardstate(&mut self, hs: HardState) {
+        self.raft_state.hard_state = hs;
+    }
+
+    /// Get the hard state.
+    pub fn hard_state(&self) -> &HardState {
+        &self.raft_state.hard_state
+    }
+
+    /// Get the mut hard state.
+    pub fn mut_hard_state(&mut self) -> &mut HardState {
+        &mut self.raft_state.hard_state
+    }
+
     fn first_index(&self) -> u64 {
         let rtxn = self.env.read_txn().unwrap();
         let r = self.entries.first(&rtxn);
@@ -322,6 +338,8 @@ impl RaftDB {
     }
 }
 
+
+#[derive(Clone)]
 pub struct RaftDiskStorage {
     raftdb: Arc<RwLock<RaftDB>>, // Do we need to use tokio::sync::RwLock?
 }

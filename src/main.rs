@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 
 mod handlers;
 mod kvstore;
-mod raftstore;
+pub mod raftstore;
 
 use crate::handlers::router;
 

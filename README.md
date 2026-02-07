@@ -60,5 +60,8 @@ Implementation will roughly follow [tinykv course outline](https://github.com/ta
 * https://github.com/talent-plan/tinykv
 * https://hyper.rs/
 * https://dev.to/daaitch/rust-ownership-and-borrows-fighting-the-borrow-checker-4ea3
+* https://github.com/ritelabs/riteraft
+* https://github.com/datafuselabs/openraft
+* https://github.com/Fomalhauthmj/dkvrr
 
 
